@@ -31,25 +31,31 @@ module Nsq
     #     interval: 60
     #
     def discover_repeatedly(opts = {})
+      attempt_discovery(opts)
       @discovery_thread = Thread.new do
 
         @discovery = Discovery.new(opts[:nsqlookupds])
 
         loop do
-          begin
-            nsqds = nsqds_from_lookupd(opts[:topic])
-            drop_and_add_connections(nsqds)
-          rescue DiscoveryException
-            # We can't connect to any nsqlookupds. That's okay, we'll just
-            # leave our current nsqd connections alone and try again later.
-            warn 'Could not connect to any nsqlookupd instances in discovery loop'
-          end
           sleep opts[:interval]
+          attempt_discovery(opts)
         end
 
       end
 
       @discovery_thread.abort_on_exception = true
+    end
+
+
+    def attempt_discovery(opts)
+      begin
+        nsqds = nsqds_from_lookupd(opts[:topic])
+        drop_and_add_connections(nsqds)
+      rescue DiscoveryException
+        # We can't connect to any nsqlookupds. That's okay, we'll just
+        # leave our current nsqd connections alone and try again later.
+        warn 'Could not connect to any nsqlookupd instances in discovery loop'
+      end
     end
 
 
